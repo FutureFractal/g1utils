@@ -1,177 +1,237 @@
 # g1text.py
-#coding=UTF-8
+from __future__ import annotations
 
-from gbutils import AddressError
+from .g1base import *
 
-if "xrange" in globals(): range = xrange # py2 compat
+import gbutils
 
-
-### Names
-
-def get_mon_name(rom, n, **opt):
-	length = 5 if rom.is_japan else 10
-	return decode_string(rom.lang, rom.table_read_bytes("mon_names", length, (n - 1) & 0xFF), **opt)
-
-def _get_packed_name(rom, n, location, opt, len=None):
-	if n <= 195:
-		bank, addr = rom.get_location(location)
-		for i in range((n - 1) & 0xFF):
-			addr = get_string_end(rom, bank, addr)
-		return get_string(rom, bank, addr, len=len, **opt)
-	elif n > 200:
-		return "TM%.2d" % (n - 200)
-	else:
-		return "HM%.2d" % (n - 195)
-def get_item_name(rom, n, **opt):
-	return _get_packed_name(rom, n, "item_names", opt)
-def get_move_name(rom, n, **opt):
-	return _get_packed_name(rom, n, "move_names", opt)
-def get_trainer_name(rom, n, **opt):
-	if n in (0x19, 0x2A, 0x2B): return _rival_name(rom)
-	return _get_packed_name(rom, n, "trainer_names", opt, 12)
-
-def get_type_name(rom, n, **opt):
-	bank, addr = rom.table_read_addr("type_names", n)
-	return get_string(rom, bank, addr, **opt)
+_default = object() # default value for "default" param
+_hexbyte = lambda b: f"<{b:02X}>"
 
 
-### Strings
+#== Strings ================================================================================================
 
-def get_string_end(rom, bank, addr):
-	i = rom.byte_iter(bank, addr)
+def read_string(mem: Memory, bank: int, addr: int, length:int=None,
+             /, sram_bank:int=None, lang:str=None, default=_default, **opt) -> str:
+	"""
+	Read and decode a string from a memory image.
+	"""
+	if not lang: lang = mem.lang
+	try:
+		if length is None: data = mem.stream(bank, addr, sram_bank=sram_bank)
+		else:              data = mem.read_bytes(bank, addr, length, sram_bank=sram_bank)
+		return decode_string(lang, data, **opt)
+	except AddressError:
+		if default is _default: raise
+		elif callable(default): return default(addr)
+		else:                   return default
+
+def next_string(s: Memory.Stream, lang:str=None, **opt) -> str:
+	if not lang: lang = s.mem.lang
+	return decode_string(lang, s, **opt)
+
+def find_string_end(mem: Memory, bank: int, addr: int, /, sram_bank:int=None) -> int:
+	i = mem.stream(bank, addr, sram_bank=sram_bank)
 	for b in i:
 		if b == 0x50: break
-	return i.addr
+	return _printed_string_end(mem, b) or i.addr
 
-def get_print_string_end(rom, bank, addr):
-	i = rom.byte_iter(bank, addr)
+def find_printed_string_end(rom: Memory, bank: int, addr: int, /, sram_bank:int=None) -> int:
+	i = rom.stream(bank, addr, sram_bank=sram_bank)
 	for b in i:
 		if _chars_EFIGS[b] is None: break
-	return i.addr
+	return _printed_string_end(rom, b) or i.addr
 
-def get_string_and_end(rom, bank, addr, lang=None, **opt):
-	if not lang: lang = rom.lang
-	i = rom.byte_iter(bank, addr)
-	s = decode_string(lang, i, **opt)
-	return s, i.addr
+def _printed_string_end(mem: Memory, c):
+	# The string printing routine returns a pointer to the last character read
+	# in register de on completion. This is used by several routines to find the end
+	# of a string after printing it. However, a few control characters will terminate
+	# a string by printing their own special strings, which clobbers this register.
+	# (This is why several glitchmons share the same dex entry aside from species name)
+	if   c == 0x00:
+		return mem.location("char00_script")
+	elif c == 0x57 or c == 0x58:
+		return mem.location("char57_script")
 
-_default = object()
-def get_string(rom, bank, addr, len=None, lang=None, default=_default, **opt):
-	if not lang: lang = rom.lang
-	try:
-		if len is None: i = rom.byte_iter(bank, addr)
-		else:           i = rom.read_bytes(bank, addr, len)
-		return decode_string(lang, i, **opt)
-	except AddressError:
-		if default is not _default: return default
-		else: raise
+def get_packed_name(rom: Memory, bank: int, addr: int, n: int, length=None, default=_default, **opt) -> str:
+	if n <= 195:
+		s = rom.stream(bank, addr)
+		try:
+			for _ in range((n - 1) & 0xFF):
+				while s.next8() != 0x50: pass
+			if length is not None: s = s.next_bytes(length)
+			return decode_string(rom.lang, s, **opt)
+		except AddressError:
+			if default is _default: raise
+			elif callable(default): return default(n)
+			else:                   return default
+	elif n > 200:
+		return f"TM{n-200:02}"
+	else:
+		return f"HM{n-195:02}"
 
 
-### Text decoding
+#== Text decoding ==========================================================================================
 
-_hexbyte = lambda b: ("<%.2X>" % b)
-_vchar_opt = {
-	"field":      0,
-	"overworld":  0,
-	"dex":        1,
-	"pokedex":    1,
-	"party":      2,
-	"stats":      3,
-	"battle":     4,
-	"hof":        5,
-	"halloffame": 5
-}
-def decode_string(lang, bytes, gchar=_hexbyte, vchar=None):
-	charset = _charsets[lang]
-	if vchar:
-		vchar = _vchar_opt[vchar]
-	chars  = charset[0]
-	bytes  = iter(bytes)
-	params = charset + (bytes, gchar, vchar)
-	buf    = []
-	for b in bytes:
+def decode_char(lang: str, c: int, **opt) -> str:
+	"""
+	Decode a single character.
+	"""
+	if c >= 0x60:
+		charset = _charsets.get(lang)
+		if charset is None:
+			raise Exception("lang must be one of [J,E,F,I,G,S]")
+
+	else:
+		return f"<{c:02X}>"
+
+def decode_string(lang: str, data: Sequence[int], **opt) -> str:
+	"""
+	Decode a string.
+
+	Arguments:
+	
+	data
+		The string bytes.
+	lang
+		The language/character encoding.
+
+	Optional arguments:
+	
+	grepr
+		The string repsesentation for "glitch block" characters.
+		Can be a string or a function that converts a character value to a string.
+		Default: The character's hex code, with the form "<XX>"
+	vrepr
+		The contextual tileset to use for varying characters.
+		Possible values:
+		- field / overworld
+		- dex / pokedex
+		- party
+		- stats
+		- battle
+		- hof / halloffame
+	nocaps
+		Pass True to make string control characters not be all caps.
+	newlines
+		Pass True to make newline control characters decode to newlines.
+	"""
+	data = iter(data)
+	
+	charset = _charsets.get(lang)
+	if charset is None:
+		raise Exception("lang must be one of [J,E,F,I,G,S]")
+	chars = charset.chars
+	
+	opt.setdefault("grepr",    _hexbyte)
+	opt.setdefault("caps",     True)
+	opt.setdefault("newlines", False)
+	opt["vchar"] = _vchar_opt.get(opt.get("vchar"))
+	opt["data"]  = data
+	
+	buf = bytearray()
+	for b in data:
 		c = chars[b]
 		if type(c) is str:
-			buf.append(c)
-		elif c:
-			buf.append(c(b, params))
-		else:
-			if b == 0x5F: buf.append(chars[0xE8])
+			buf.extend(c.encode())
+		elif c is not None:
+			buf.extend(c(b, charset, opt).encode())
+		else: # terminator char
+			if b != 0x50:
+				if b == 0x5F:
+					buf.extend(chars[0xE8].encode()) # dot char
+				elif isinstance(data, gbutils.Memory.Stream):
+					data.seek(None, _printed_string_end(data.mem, b))
 			break
-	return ''.join(buf)
 
-def _c_lang(b, params):
-	return params[1][b - 0xBA]
-def _c_langctrl(b, params):
-	return params[3][b]
+	return buf.decode()
 
-def _c_ctrl(b, params):
+
+#== Special characters =====================================================================================
+
+def _c_lang(b, charset, opt):
+	return charset.lang[b - 0xBA]
+
+def _c_langctrl(b, charset, opt):
+	s = charset.ctrl[b]
+	if opt["caps"]: s = s.upper()
+	return s
+
+def _c_ctrl(b, charset, opt):
 	return _ctrl_char_codes[b]
 
-# TODO: add in options for converting these to newlines
-_c_newline = _c_ctrl
-_c_prompt  = _c_ctrl
+def _c_newline(b, charset, opt):
+	if opt["newlines"]: return "\n"
+	return _c_ctrl(b, charset, opt)
+_c_prompt = _c_newline
 
-# TODO: if I ever support reading from RAM savestates, have these chars read from RAM
-_c_player = _c_ctrl
-_c_rival  = _c_ctrl
-_c_target = _c_ctrl
-_c_user   = _c_ctrl
+def _c_player(b, charset, opt):
+	return _c_ctrl(b, charset, opt)
 
-# "glitch block" chars
-def _c_glitch(b, params):
-	return params[5](b)
+def _c_rival(b, charset, opt):
+	return _c_ctrl(b, charset, opt)
 
-# chars from 0x60-0x78 vary depending on the current gamemode (overworld, battle, etc)
-def _c_varying(b, params):
-	mode = params[6]
-	if mode is not None:
-		c = _varying_chars[b - 0x60][mode]
+def _c_target(b, charset, opt):
+	return _c_ctrl(b, charset, opt)
+
+def _c_user(b, charset, opt):
+	return _c_ctrl(b, charset, opt)
+	
+def _c_poke(b, charset, opt):
+	return "POKé"   if opt["caps"] else "Poké"
+def _c_rocket(b, charset, opt):
+	return "ROCKET" if opt["caps"] else "Rocket"
+
+# Non-text tiles ("glitch block" characters)
+def _c_glitch(c, charset, opt):
+	grepr = opt["grepr"]
+	return grepr(c) if callable(grepr) else grepr
+
+# Tiles/characters from 0x60-0x78 vary depending on the current gamemode (overworld, battle, etc)
+def _c_varying(b, charset, opt):
+	v = opt["vchar"]
+	if v is not None:
+		c = _varying_chars[b - 0x60][v]
 		if type(c) is str:  return c
-		elif c is not None: return params[2][c]
-	return params[5](b) # default to glitch block behavior
+		elif c is not None: return charset.varying[c]
+	return _c_glitch(b, charset, opt) # default to glitch block
 
-# chars E4 and E5 in Japanese versions place a handakuten or dakuten, respectively,
-# above the following char.
-_cc_chars     = ("゜", "゛")
-_cc_combining = ("゚", "゙") # Unicode combining chars
-_python3      = "unicode" not in globals()
-def _c_combining(bc, params):
-	bytes = params[4]
-	b = next(bytes, 0x50)
+# Characters E4 and E5 in japanese versions place a handakuten/dakuten above the following character
+_cc_noncombining = ("゜","゛")
+_cc_combining    = ("\u309A","\u3099") # Unicode combining handakuten/dakuten
+def _c_combining(cc, charset, opt):
+	data = opt["data"]
+
+	# Combining chars will overwrite preceding combining chars, so loop until we get a non-combining char
+	c = next(data, 0x50)
+	while c & 0xFE == 0xE4:
+		cc, c = c, next(data, 0x50)
+	cc &= 1
 	
-	# combining chars will overwrite preceding combining chars
-	while b == 0xE4 or b == 0xE5:
-		bc, b = b, next(bytes, 0x50)
-	
-	bc -= 0xE4
-	c = _chars_J[b]
-	if b >= 0x60:
-		if c is not _c_varying:
-			return c + _cc_combining[bc]
-		elif params[6] is not None:
-			c = _c_varying(b, params)
-			if c[0] == "<": return c + _cc_chars[bc]
-			else:           return c + _cc_combining[bc]
-		else:
-			return params[5](b) + _cc_chars[bc]
-	elif type(c) is str:
-		# precomposed chars will overwrite combining chars.
-		# combining chars will combine with the first char of a string-printing char
+	s = _chars_J[c]
+	if   c > 0x78:
+		return s + _cc_combining[cc]
+	elif c < 0x7B:
+		# Precomposed chars will overwrite combining chars
+		return s
+	elif s is not None:
+		if type(s) is not str: s = s(c, charset, opt)
+		if s[0] == "{" or s[0] == "<":
+			return _cc_noncombining[cc] + s
+		# Combining chars will combine with the first char of a string-printing char
 		# if that first char is not a precomposed char.
-		if b not in (0x46, 0x4C, 0x4D, 0x4E):
-			return c
-		elif _python3:
-			return c[0] + _cc_combining[bc] + c[1:]
+		elif c not in (0x4D, 0x54, 0x5B):
+			return s[0] + _cc_combining[cc] + s[1:]
 		else:
-			c = unicode(c)
-			return (c[0] + _cc_combining[bc] + c[1:]).encode("utf-8")
-	elif c:
-		return _cc_chars[bc] + c(b, params)
-	elif b == 0x5F:
-		return "。" + _cc_combining[bc]
+			return s
+	elif c == 0x5F:
+		return "。" + _cc_combining[cc]
 	else:
-		return _cc_chars[bc]
+		return _cc_noncombining[cc]
+
+
+
+#== Charsets ===============================================================================================
 
 _G = _c_glitch
 _V = _c_varying
@@ -201,7 +261,7 @@ _chars_J = (
 	# 00
 	None,
 			
-	# 01-4F
+	# 01-4A
 		  "イ゙", "ヴ", "エ゙", "オ゙", "ガ", "ギ", "グ",
 	"ゲ", "ゴ", "ザ", "ジ", "ズ", "ゼ", "ゾ", "ダ",
 	"ヂ", "ヅ", "デ", "ド", "ナ゙", "ニ゙", "ヌ゙", "ネ゙",
@@ -212,29 +272,28 @@ _chars_J = (
 	"ね゙", "の゙", "ば", "び", "ぶ", "べ", "ぼ", "ま゙",
 	"パ", "ピ", "プ", "ポ", "ぱ", "ぴ", "ぷ", "ぺ",
 	"ぽ", "ま゚", "が",
-		  
-	# 4B-5F
-	_c_prompt,
-	_c_newline,
-	"も゚",
-	_c_newline,
-	_c_newline,
-	None,
-	_c_prompt,
-	_c_player,
-	_c_rival,
-	"ポケモン",
-	_c_newline,
-	"⋯⋯",
-	None,
-	None,
-	_c_target,
-	_c_user,
-	"パソコン",
-	"わざマシン",
-	"トレーナー",
-	"ロケットだん",
-	None,
+	
+	_c_prompt,     # 4B
+	_c_newline,    # 4C
+	"も゚",          # 4D
+	_c_newline,    # 4E
+	_c_newline,    # 4F
+	None,          # 50
+	_c_prompt,     # 51
+	_c_player,     # 52
+	_c_rival,      # 53
+	"ポケモン",     # 54
+	_c_newline,    # 55
+	"⋯⋯",        # 56
+	None,          # 57
+	None,          # 58
+	_c_target,     # 59
+	_c_user,       # 5A
+	"パソコン",     # 5B
+	"わざマシン",   # 5C
+	"トレーナー",   # 5D
+	"ロケットだん", # 5E
+	None,          # 5F
 	
 	# 60-FF
 	_V,   _V,   _V,   _V,   _V,   _V,   _V,   _V,
@@ -262,7 +321,7 @@ _chars_EFIGS = (
 	# 00
 	None,
 		   
-	# 01-47
+	# 01-48
 		  _G,   _G,   _G,   _G,   _G,   _G,   _G,
 	_G,   _G,   _G,   _G,   _G,   _G,   _G,   _G,
 	_G,   _G,   _G,   _G,   _G,   _G,   _G,   _G,
@@ -273,31 +332,30 @@ _chars_EFIGS = (
 	_G,   _G,   _G,   _G,   _G,   _G,   _G,   _G,
 	_G,   _G,   _G,   _G,   _G,   _G,   _G,   _G,
 	_G,
-		 
-	# 49-5F
-	_c_prompt,
-	"<PKMN>",
-	_c_prompt,
-	_c_newline,
-	_G,
-	_c_newline,
-	_c_newline,
-	None,
-	_c_prompt,
-	_c_player,
-	_c_rival,
-	"Poké",
-	_c_newline,
-	"⋯⋯",
-	None,
-	None,
-	_c_target,
-	_c_user,
-	"PC",
-	_c_langctrl,
-	_c_langctrl,
-	"Rocket",
-	None,
+	
+	_c_prompt,   # 49
+	"<PKMN>",    # 4A
+	_c_prompt,   # 4B
+	_c_newline,  # 4C
+	_G,          # 4D
+	_c_newline,  # 4E
+	_c_newline,  # 4F
+	None,        # 50
+	_c_prompt,   # 51
+	_c_player,   # 52
+	_c_rival,    # 53
+	_c_poke,     # 54
+	_c_newline,  # 55
+	"⋯⋯",      # 56
+	None,        # 57
+	None,        # 58
+	_c_target,   # 59
+	_c_user,     # 5A
+	"PC",        # 5B
+	_c_langctrl, # 5C
+	_c_langctrl, # 5D
+	_c_rocket,   # 5E
+	None,        # 5F
 
 	# 60-B9
 	_V,   _V,   _V,   _V,   _V,   _V,   _V,   _V,
@@ -350,6 +408,17 @@ _chars_GF = (
 	None, None, None, None, "+",  " "
 )
 
+_vchar_opt = {
+	"field":      0,
+	"overworld":  0,
+	"dex":        1,
+	"pokedex":    1,
+	"party":      2,
+	"stats":      3,
+	"battle":     4,
+	"hof":        5,
+	"halloffame": 5
+}
 _varying_chars = (
 #     field  dex    party  stats  battle hof
 	( "<A>", 4,     "<A>", "<A>", None,  None  ),
@@ -367,16 +436,16 @@ _varying_chars = (
 	( "<M>", None,  None,  None,  None,  "<M>" ),
 	( "：",  None,  "║",   "┃",  "┃",  "："  ),
 	( "ぃ",  None,  6,     6,     6,     "ぃ"  ),
-	( "ぅ",  None,  "◢",  "◢",  "◢",  "ぅ"  ),
+	( "ぅ",  None,  "◢",  "◢",  "◢",  "ぅ"   ),
 	( 0,     7,     7,     7,     7,     0     ),
 	( 1,     "┃",  None,  None,  None,  1     ),
 	( 2,     None,  "『",  "<P>", "『",  2     ),
 	( 3,     8,     8,     8,     "┃",  3     ),
 	( "・",  9,     9,     9,     "┗",  "・"  ),
 	None,
-	( "ぁ",  "━",  "━",  "━",  "━",  "ぁ"  ),
-	( "ぇ",  "▔",  "▔",  "┛",  "┛",  "ぇ"  ),
-	( "ぉ",  "◣",  "◣",  "┃",  "◣",  "ぉ"  )
+	( "ぁ",  "━",  "━",  "━",  "━",  "ぁ"   ),
+	( "ぇ",  "▔",  "▔",  "┛",  "┛",  "ぇ"   ),
+	( "ぉ",  "◣",  "◣",  "┃",  "◣",  "ぉ"   )
 )
 _varying_chars_J = ( "「", "」", "『", "』", "<m>","<k>",":ʟ", "ど",  "ɪᴅ", "№"   )
 _varying_chars_E = ( "‘",  "’",  "“",  "”", "′",  "″",  ":ʟ", "<to>","ɪᴅ", "№"   )
@@ -403,10 +472,38 @@ _ctrl_chars_S = {
 }
 
 _charsets = {
-	"J": ( _chars_J,     None,      _varying_chars_J, None           ),
-	"E": ( _chars_EFIGS, _chars_E,  _varying_chars_E, _ctrl_chars_EG ),
-	"F": ( _chars_EFIGS, _chars_GF, _varying_chars_F, _ctrl_chars_F  ),
-	"I": ( _chars_EFIGS, _chars_IS, _varying_chars_I, _ctrl_chars_I  ),
-	"G": ( _chars_EFIGS, _chars_GF, _varying_chars_G, _ctrl_chars_EG ),
-	"S": ( _chars_EFIGS, _chars_IS, _varying_chars_S, _ctrl_chars_S  )
+	"J": Info(
+		chars   = _chars_J,
+		varying = _varying_chars_J
+	),
+	"E": Info(
+		chars   = _chars_EFIGS,
+		lang    = _chars_E,
+		varying = _varying_chars_E,
+		ctrl    = _ctrl_chars_EG
+	),
+	"F": Info(
+		chars   = _chars_EFIGS,
+		lang    = _chars_GF,
+		varying = _varying_chars_F,
+		ctrl    = _ctrl_chars_F
+	),
+	"I": Info(
+		chars   = _chars_EFIGS,
+		lang    = _chars_IS,
+		varying = _varying_chars_I,
+		ctrl    = _ctrl_chars_I
+	),
+	"G": Info(
+		chars   = _chars_EFIGS,
+		lang    = _chars_GF,
+		varying = _varying_chars_G,
+		ctrl    = _ctrl_chars_EG
+	),
+	"S": Info(
+		chars   = _chars_EFIGS,
+		lang    = _chars_IS,
+		varying = _varying_chars_S,
+		ctrl    = _ctrl_chars_S
+	)
 }

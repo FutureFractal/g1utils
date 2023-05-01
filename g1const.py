@@ -1,6 +1,4 @@
-# g1constants.py
-
-if "xrange" in globals(): range = xrange # py2 compat
+# g1const.py
 
 class _range_0_:
 	def __init__(self, start, end, zero=0):
@@ -11,7 +9,7 @@ class _range_0_:
 		for id in self._ids: yield id
 
 
-_mon_dex_nums = (
+_mon_dex_nums = bytes((
 	112, 115, 32,  35,  21,  100, 34,  80,  2,   103,
 	108, 102, 88,  94,  29,  31,  104, 111, 131, 59,
 	151, 130, 90,  72,  92,  123, 120, 9,   127, 114,
@@ -31,7 +29,7 @@ _mon_dex_nums = (
 	0,   0,   77,  78,  19,  20,  33,  30,  74,  137,
 	142, 0,   81,  0,   0,   4,   7,   5,   8,   6,
 	0,   0,   0,   0,   43,  44,  45,  69,  70,  71
-)
+))
 _dex_mon_names = (
 	"missingno",
 	"bulbasaur",
@@ -186,16 +184,27 @@ _dex_mon_names = (
 	"mewtwo",
 	"mew"
 )
-def get_mon_dex_num(n):
+def mon_index_dex_num(n: int) -> int:
 	i = (n - 1) & 0xFF
 	if i < 190: return _mon_dex_nums[i]
-def get_dex_mon_name(n):
+def dex_mon_name(n: int) -> str:
 	if n <= 151: return _dex_mon_names[n]
-def get_mon_name(n):
+def mon_name(n: int) -> str:
 	i = (n - 1) & 0xFF
-	if i < 190: return _dex_mon_names[_mon_dex_nums[i]]
+	if i < 190:
+		i = _mon_dex_nums[i]
+		if i != 0: return _dex_mon_names[i]
+		else:      return f"missingno_{n:2X}"
 
-missingno_ids = (
+def mon_dex_num(name: str) -> int:
+	n = _dex_mon_names.index(name)
+	if n != -1: return n
+def mon_index(name: str) -> int:
+	n = mon_dex_num(name)
+	if n: return _mon_dex_nums.index(n) + 1
+
+
+missingno_ids = bytes((
 	31,  32,  50,  52,  56,  61,
 	62,  63,  67,  68,  69,  79,
 	80,  81,  86,  87,  94,  95,
@@ -203,19 +212,11 @@ missingno_ids = (
 	137, 140, 146, 156, 159, 160,
 	161, 162, 172, 174, 175, 181,
 	182, 183, 184
-)
+))
 glitchmon_ids      = _range_0_(191, 256)
 glitchmon_dex_nums = _range_0_(152, 256)
 
 
-_machine_moves = (
-	5,   13,  14,  18,  25,  92,  32,  34,  36,  38,
-	61,  55,  58,  59,  63,  6,   66,  68,  69,  99,
-	72,  76,  82,  85,  87,  89,  90,  91,  94,  100,
-	102, 104, 115, 117, 118, 120, 121, 126, 129, 130,
-	135, 138, 143, 156, 86,  149, 153, 157, 161, 164,
-	15,  19,  57,  70,  148
-)
 _move_names = (
 	"none",
 	"pound",
@@ -384,19 +385,35 @@ _move_names = (
 	"substitute",
 	"struggle"
 )
-def get_move_name(n):
+def move_name(n: int) -> str:
 	if n <= 165: return _move_names[n]
-	else:        return get_machine_item_name(n)
-def get_machine_move(n):
-	if n <= 55: return _machine_moves[n]
-def get_machine_move_name(n):
-	if n <= 55: return _move_names[_machine_moves[n]]
-def get_machine_name(n):
-	if   n < 50: return ("TM%.2d" % (n + 1))
-	elif n < 55: return ("HM%.2d" % (n - 49))
+	else:        return machine_item_name(n)
+def move_index(name: str) -> int:
+	n = _move_names.index(name)
+	if n != -1: return n
+	else:       return machine_item_index(name)
 
 glitch_move_ids      = _range_0_(166, 256)
 glitch_move_name_ids = _range_0_(166, 196)
+
+
+_machine_moves = bytes((
+	5,   13,  14,  18,  25,  92,  32,  34,  36,  38,
+	61,  55,  58,  59,  63,  6,   66,  68,  69,  99,
+	72,  76,  82,  85,  87,  89,  90,  91,  94,  100,
+	102, 104, 115, 117, 118, 120, 121, 126, 129, 130,
+	135, 138, 143, 156, 86,  149, 153, 157, 161, 164,
+	15,  19,  57,  70,  148
+))
+def machine_move(n: int) -> int:
+	if n <= 55: return _machine_moves[n]
+def machine_move_name(n: int) -> str:
+	if n <= 55: return _move_names[_machine_moves[n]]
+def machine_name(n: int) -> str:
+	return machine_item_name(n + 200)
+def move_machine(n: int) -> int:
+	n = _machine_moves.find(n)
+	if n != -1: return n
 
 
 _item_names = (
@@ -407,7 +424,7 @@ _item_names = (
 	"poke_ball",
 	"town_map",
 	"bicycle",
-	"unused_07", # ????? (surfboard)
+	"unused_surfboard", # ?????
 	"safari_ball",
 	"pokedex",
 	"moon_stone",
@@ -450,7 +467,7 @@ _item_names = (
 	"leaf_stone",
 	"card_key",
 	"nugget",
-	"pp_up",
+	"unused_pp_up",
 	"poke_doll",
 	"full_heal",
 	"revive",
@@ -475,7 +492,7 @@ _item_names = (
 	"silph_scope",
 	"poke_flute",
 	"lift_key",
-	"exp_share",
+	"exp_all",
 	"old_rod",
 	"good_rod",
 	"super_rod",
@@ -499,12 +516,23 @@ _item_names = (
 	"11F",
 	"B4F"
 )
-def get_item_name(n):
+def item_name(n: int) -> str:
 	if n <= 97: return _item_names[n]
-	else:       return get_machine_item_name(n)
-def get_machine_item_name(n):
-	if   n > 200: return ("TM%02d" % (n - 200))
-	elif n > 195: return ("HM%02d" % (n - 195))
+	else:       return machine_item_name(n)
+def machine_item_name(n: int) -> str:
+	if   n > 200: return f"TM{n - 200:02}"
+	elif n > 195: return f"HM{n - 195:02}"
+
+def item_index(name: str) -> int:
+	n = _item_names.index(name)
+	if n != -1: return n
+	else:       return machine_item_index(name)
+def machine_item_index(name: str) -> int:
+	t, n = name[:2].upper(), name[2:]
+	if n.isdigit():
+		n = int(n)
+		if   t == "TM" and 0 <= n <= 55: return n + 200
+		elif t == "HM" and 0 <= n <= 5:  return n + 195
 
 glitch_item_ids      = _range_0_(84, 196)
 glitch_item_name_ids = _range_0_(97, 196)
@@ -516,16 +544,16 @@ _trainer_names = (
 	"bug_catcher",
 	"lass",
 	"sailor",
-	"camper",    # jr_trainer_m
-	"picnicker", # jr_trainer_f
+	"jr_trainer_m",
+	"jr_trainer_f",
 	"pokemaniac",
 	"super_nerd",
 	"hiker",
 	"biker",
 	"burglar",
 	"engineer",
-	"juggler",
-	"fisherman",
+	"unused_juggler",
+	"fisher",
 	"swimmer",
 	"cue_ball",
 	"gambler",
@@ -536,14 +564,14 @@ _trainer_names = (
 	"tamer",
 	"bird_keeper",
 	"black_belt",
-	"rival1",
-	"prof_oak",
-	"chief",
+	"rival",
+	"professor_oak", # unused
+	"chief",         # unused
 	"scientist",
 	"giovanni",
-	"rocket_grunt",  # rocket
-	"ace_trainer_m", # cooltrainer_m
-	"ace_trainer_f", # cooltrainer_f
+	"rocket",
+	"cool_trainer_m",
+	"cool_trainer_f",
 	"bruno",
 	"brock",
 	"misty",
@@ -554,19 +582,62 @@ _trainer_names = (
 	"sabrina",
 	"gentleman",
 	"rival2",
-	"rival3",
+	"rival_champion",
 	"lorelei",
 	"channeler",
 	"agatha",
 	"lance"
 )
-def get_trainer_name(n):
-	if n <= 47: return _trainer_names[n]
-	else:       return get_machine_item_name(n)
+_modern_trainer_names = {
+	5:  "camper",
+	6:  "picnicker",
+	13: "juggler",
+	15: "swimmer_m",
+	19: "psychic_m",
+	30: "rocket_grunt_m",
+	31: "ace_trainer_m",
+	32: "ace_trainer_f"
+}
+def trainer_name(n: int, modern:bool=False):
+	if n <= 47:
+		if modern:
+			name = _modern_trainer_names.get(n)
+			if name: return name
+		return _trainer_names[n]
+	else: 
+		return machine_item_name(n)
+
+def trainer_index(name: str) -> int:
+	n = _trainer_names.index(name)
+	if n != -1: return n
+	else:       return machine_item_index(name)
 
 glitch_trainer_ids           = _range_0_(48, 256)
 glitch_trainer_name_ids      = _range_0_(48, 196)
 glitch_trainer_encounter_ids = _range_0_(248, 256, zero=200)
+
+
+def encounter_name(n: int, modern:bool=False) -> str:
+	if n < 200: return mon_name(n)
+	else:       return trainer_name((n - 200) & 0xFF, modern)
+def encounter_index(name: str) -> int:
+	n = mon_index(name)
+	if n is not None: return n
+	n = trainer_index(name)
+	if n is not None and n < 200: return n + 200
+
+def wild_encounter_name(n: int, modern:bool=False) -> str:
+	if n < 200: 
+		return mon_name(n)
+	else:
+		name = trainer_name((n - 200) & 0xFF, modern)
+		if name: return "trainer_" + name
+def trainer_encounter_name(n: int, modern:bool=False) -> str:
+	if n >= 200: 
+		return trainer_name((n - 200) & 0xFF, modern)
+	else:
+		name = mon_name(n)
+		if name: return "mon_" + name
 
 
 _type_names = (
@@ -579,17 +650,17 @@ _type_names = (
 	"BIRD",
 	"BUG",
 	"GHOST",
-	"NORMAL",
-	"NORMAL",
-	"NORMAL",
-	"NORMAL",
-	"NORMAL",
-	"NORMAL",
-	"NORMAL",
-	"NORMAL",
-	"NORMAL",
-	"NORMAL",
-	"NORMAL",
+	 None,
+	 None,
+	 None,
+	 None,
+	 None,
+	 None,
+	 None,
+	 None,
+	 None,
+	 None,
+	 None,
 	"FIRE",
 	"WATER",
 	"GRASS",
@@ -598,9 +669,28 @@ _type_names = (
 	"ICE",
 	"DRAGON"
 )
-def get_type_name(n):
-	i = n & 0x7F
-	if i < 27: return _type_names[i]
+_glitch_type_trainer_names = bytes((
+	1, 1, 1, 0, 1, 1, 1, 1, 
+	0, 0, 1, 1, 1, 0, 1, 0, 
+	0, 1, 0, 1, 1, 0, 0, 1, 
+	0, 1, 1, 1, 0, 1, 1, 1
+))
+def type_name(n: int, glitch:bool=False) -> str:
+	if n < 27: return _type_names[n]
+	elif glitch:
+		n &= 0x7F
+		if   n < 27:
+			return _type_names[n] or "NORMAL"
+		elif n >= 91:
+			n -= 91
+			if n < 32 and _glitch_type_trainer_names[n]:
+				return _trainer_names[n+1].upper()
+			else:
+				return "LAST_TRAINER"	
+
+def type_index(name: str) -> int:
+	n = _type_names.index(name)
+	if n != -1: return n
 
 glitch_type_ids = range(27, 128)
 
@@ -613,104 +703,162 @@ _exp_group_names = (
 	"FAST",
 	"SLOW"
 )
-def get_exp_group_name(n):
+def exp_group_name(n: int) -> str:
 	n &= 0x3F
 	if n <= 5: return _exp_group_names[n]
 
 glitch_exp_group_ids = range(6, 64)
 
 
-_move_effect_names = (
-	"none",
-	"unused_01",
-	"poison_20pct",
-	"drain",
-	"burn_10pct",
-	"freeze_10pct",
-	"paralyze_10pct",
-	"selfDestruct",
-	"dreamEater",
-	"mirrorMove",
-	"boostAttack1",
-	"boostDefense1",
-	"boostSpeed1",    # unused
-	"boostSpecial1",
-	"boostAccuracy1", # unused
-	"boostEvasion1",
-	"payDay",
-	"neverMiss",
-	"lowerAttack1",
-	"lowerDefense1",
-	"lowerSpeed1",
-	"lowerSpecial1",  # unused
-	"lowerAccuracy1",
-	"lowerEvasion1",  # unused
-	"conversion",
-	"haze",
-	"bide",
-	"thrash",
-	"teleport",
-	"multiHit",
-	"unused_1E",
-	"flinch_10pct",
-	"sleep",
-	"poison_40pct",
-	"burn_30pct",
-	"freeze_30pct",   # unused outside japanese ver
-	"paralyze_30pct",
-	"flinch_30pct",
-	"ohko",
-	"chargeTurn",
-	"superFang",
-	"fixedDamage",
-	"damagingTrap",
-	"fly",
-	"twoHit",
-	"jumpKick",
-	"mist",
-	"focusEnergy",
-	"recoil4",
-	"confuse",
-	"boostAttack2",
-	"boostDefense2",
-	"boostSpeed2",
-	"boostSpecial2",
-	"boostAccuracy2", # unused
-	"boostEvasion2",  # unused
-	"healHalf",
-	"transform",
-	"lowerAttack2",   # unused
-	"lowerDefense2",
-	"lowerSpeed2",    # unused
-	"lowerSpecial2",  # unused
-	"lowerAccuracy2", # unused
-	"lowerEvasion2",  # unused
-	"lightScreen",
-	"reflect",
-	"poison",
-	"paralyze",
-	"lowerAttack_33pct",
-	"lowerDefense_33pct",
-	"lowerSpeed_33pct",
-	"lowerSpecial_33pct",
-	"unused_48",
-	"unused_49",
-	"unused_4A",
-	"unused_4B",
-	"confuse_10pct",
-	"twineedle",
-	"unused_4E",
-	"substitute",
-	"rechargeTurn",
-	"rage",
-	"mimic",
-	"metronome",
-	"leechSeed",
-	"splash",
-	"disable"
+_anim_names = (
+	"show_sprite",
+	"enemy_damaged",
+	"player_damaged",
+	"enemy_screen_shake",
+	"trade_ball_drop",
+	"trade_ball_appear1",
+	"trade_ball_appear2",
+	"trade_ball_poof",
+	"player_spiral_light",
+	"enemy_spiral_light",
+	"player_square_light",
+	"enemy_square_light",
+	"player_spiral_dark",
+	"enemy_spiral_dark",
+	"player_square_dark",
+	"enemy_square_dark",
+	"player_unused",
+	"enemy_unused",
+	"player_paralyzed",
+	"enemy_paralyzed",
+	"player_poison_burn",
+	"enemy_poison_burn",
+	"player_asleep",
+	"enemy_asleep",
+	"player_confused",
+	"enemy_confused",
+	"faint",
+	"ball_throw",
+	"ball_shake",
+	"ball_poof",
+	"ball_block",
+	"great_ball_throw",
+	"ultra_ball_throw",
+	"screen_shake",
+	"hide_sprite",
+	"throw_rock",
+	"throw_bait",
+	"screen_wave"
 )
-def get_move_effect_name(n):
-	if n <= 86: return _move_effect_names[n]
+def animation_name(n: int) -> str:
+	if   n <= 165: return _move_names[n]
+	elif n <= 202: return _anim_names[n - 166]
+
+
+_move_effect_info = (
+	"none",                0b11,
+	"sleep",               0b01, # unused
+	"poison_20pct",        0b11,
+	"drain",               0b11,
+	"burn_10pct",          0b11,
+	"freeze_10pct",        0b11,
+	"paralyze_10pct",      0b11,
+	"self_destruct",       0b11,
+	"dream_eater",         0b11,
+	"mirror_move",         0b00,
+	"boostAttack",         0b00,
+	"boostDefense",        0b00,
+	"boostSpeed",          0b00, # unused
+	"boostSpecial",        0b00,
+	"boostAccuracy",       0b00, # unused
+	"boostEvasion",        0b00,
+	"pay_day",             0b11,
+	"neverMiss",           0b10,
+	"lowerAttack",         0b01,
+	"lowerDefense",        0b01,
+	"lowerSpeed",          0b01,
+	"lowerSpecial",        0b01, # unused
+	"lowerAccuracy",       0b01,
+	"lowerEvasion",        0b01, # unused
+	"conversion",          0b00,
+	"haze",                0b00,
+	"bide",                0b01,
+	"thrash",              0b11,
+	"endWildBattle",       0b00,
+	"multiHit",            0b11,
+	"multiHit",            0b11, # unused
+	"flinch_10pct",        0b11,
+	"sleep",               0b01,
+	"poison_40pct",        0b11,
+	"burn_30pct",          0b11,
+	"freeze_30pct",        0b11, # unused outside japanese ver
+	"paralyze_30pct",      0b11,
+	"flinch_30pct",        0b11,
+	"ohko",                0b01,
+	"chargeTurn",          0b11,
+	"super_fang",          0b01,
+	"fixedDamage",         0b01,
+	"trapAttack",          0b11,
+	"fly",                 0b11,
+	"twoHit",              0b11,
+	"jump_kick",           0b11,
+	"mist",                0b00,
+	"focus_energy",        0b00,
+	"recoil4",             0b11,
+	"confuse",             0b01,
+	"boostAttack2",        0b00,
+	"boostDefense2",       0b00,
+	"boostSpeed2",         0b00,
+	"boostSpecial2",       0b00,
+	"boostAccuracy2",      0b00, # unused
+	"boostEvasion2",       0b00, # unused
+	"healHalf",            0b00,
+	"transform",           0b00,
+	"lowerAttack2",        0b01, # unused
+	"lowerDefense2",       0b01,
+	"lowerSpeed2",         0b01, # unused
+	"lowerSpecial2",       0b01, # unused
+	"lowerAccuracy2",      0b01, # unused
+	"lowerEvasion2",       0b01, # unused
+	"light_screen",        0b00,
+	"reflect",             0b00,
+	"poison",              0b01,
+	"paralyze",            0b01,
+	"lowerAttack_33pct",   0b11,
+	"lowerDefense_33pct",  0b11,
+	"lowerSpeed_33pct",    0b11,
+	"lowerSpecial_33pct",  0b11,
+	"lowerAccuracy_33pct", 0b11, # unused
+	"lowerEvasion_33pct",  0b11, # unused
+	"lowerStat6_33pct",    0b11, # unused
+	"lowerStat7_33pct",    0b11, # unused
+	"confuse_10pct",       0b11,
+	"twineedle",           0b11,
+	"unused_4E",           0b11, # unused, crashes
+	"substitute",          0b00,
+	"rechargeTurn",        0b11,
+	"rage",                0b11,
+	"mimic",               0b00,
+	"metronome",           0b00,
+	"leech_seed",          0b01,
+	"splash",              0b00,
+	"disable",             0b01
+)
+_glitch_move_effect_names = {
+	0x1C: "whirlwind",
+	0x27: "glitchy_dig",
+	0x29: "psywave"
+}
+def move_effect_name(n: int, move:int=None) -> str:
+	if n < 87:
+		if move is not None and (move - 1) & 0xFF >= 165:
+			name = _glitch_move_effect_names.get(n)
+			if name: return name
+		return _move_effect_info[n*2]
+def move_effect_uses_power_accuracy(n: int) -> tuple[bool,bool]:
+	if n < 87: pa = _move_effect_info[n*2 + 1]
+	else:      pa = 0b11
+	return bool(pa & 0b10), bool(pa & 0b01)
 
 
 _party_sprite_names = (
@@ -728,10 +876,9 @@ _party_sprite_names = (
 	# Yellow only:
 	"PIKACHU"
 )
-def get_party_sprite_name(n, yellow=False):
+def party_sprite_name(n: int, yellow:bool=False) -> str:
 	if n < (0xA if yellow else 0x9):
 		return _party_sprite_names[n]
-
 
 _sprite_names = (
 	"none",
@@ -822,12 +969,15 @@ _still_sprite_names = (
 	 None,
 	"old_man_asleep"
 )
-def get_sprite_name(n, yellow=False):
+def sprite_name(n: int, yellow:bool=False) -> str:
 	sn = n - (0x47 if yellow else 0x3D)
 	if   sn < 0:  return _sprite_names[n]
 	elif sn < 12:
 		s = _still_sprite_names[sn]
-		return s if s else ("unused_%.2X" % n)
+		return s if s else f"unused_{n:02X}"
+
+def glitch_sprite_ids(yellow:bool=False) -> range:
+	return range(0x53 if yellow else 0x49, 0x100)
 
 
 _palette_names = (
@@ -847,7 +997,7 @@ _palette_names = (
 	"LOGO1",
 	"LOGO2",
 	"UNUSED_0F", # unused?
-	"MEW",
+	"TRAINER",
 	"BLUE",
 	"RED",
 	"CYAN",
@@ -862,9 +1012,9 @@ _palette_names = (
 	"SLOTS3",
 	"SLOTS4",
 	"BLACK",
-	"HPBAR_GREEN",
-	"HPBAR_YELLOW",
-	"HPBAR_RED",
+	"HP_BAR_GREEN",
+	"HP_BAR_YELLOW",
+	"HP_BAR_RED",
 	"BADGE_BLUE",
 	"CAVE",
 	"GAMEFREAK",
@@ -874,14 +1024,21 @@ _palette_names = (
 	"UNUSED_26",
 	"UNUSED_27"
 )
-def get_palette_name(n, yellow=False):
+def palette_name(n: int, yellow:bool=False) -> str:
 	if n <= (0x27 if yellow else 0x23):
 		return _palette_names[n]
 
-def glitch_palette_ids(yellow=False):
+def glitch_palette_ids(yellow:bool=False) -> range:
 	return range(0x28 if yellow else 0x24, 0x100)
 
 
+# For most base cries there's a Pokémon with an unmodified version of it as its cry
+# (its pitch and tempo modifiers are 0x00, 0x80 respectively.) These Pokémon are
+# typically the first ones with that basecry in index order too, so they make the
+# most sense to name the base cry after.
+# For some base cries though, denoted by a * here, there are no Pokémon with an 
+# unmodified version of it. For these I just chose the Pokémon whose cry is the 
+# closest to unmodified, and/or is the first with that base cry in index order.
 _base_cry_mon_names = (
 	"nidoran_m",  # 00
 	"nidoran_f",  # 01
@@ -912,7 +1069,7 @@ _base_cry_mon_names = (
 	"tentacool",  # 1A
 	"lapras",     # 1B
 	"gastly",     # 1C
-	"tauros",     # 1D **
+	"tauros",     # 1D *
 	"starmie",    # 1E
 	"slowbro",    # 1F
 	"mr_mime",    # 20 *
@@ -922,7 +1079,7 @@ _base_cry_mon_names = (
 	"graveler",   # 24
 	"ponyta"      # 25
 )
-def get_base_cry_mon_name(n):
+def base_cry_mon_name(n: int) -> str:
 	if n <= 0x25: return _base_cry_mon_names[n]
 
 _static_sound_names = (
@@ -933,9 +1090,9 @@ _static_sound_names = (
 	"hp_restore_item",                      # 8D
 	"use_item",                             # 8E
 	"start_menu",                           # 8F
-	"ab_press",                             # 90
+	"ui_press",                             # 90
 )
-def get_static_sound_name(n):
+def static_sound_name(n: int) -> str:
 	if n >= 0x86:
 		if 0x89 <= n <= 0x90:
 			return _static_sound_names[n - 0x89]
@@ -943,19 +1100,24 @@ def get_static_sound_name(n):
 			return "STOP_MUSIC"
 	elif n > 0x13:
 		n -= 0x14; c = n % 3
-		s = "cry_"+_base_cry_mon_names[n // 3]
-		if c != 0: s += "_ch"+str(c + 1)
+		s = "basecry_"+_base_cry_mon_names[n // 3]
+		if c != 0: s += f"_ch{c + 1}"
 		return s
 	elif n != 0:
-		return "noise%.2X" % (n - 1)
+		return f"noise{n}"
 
 _overworld_sound_names = (
-#   "item_get",                     1,2,    # 86   87 88
-#    ...                                      ...
+	"item_get",                     1,2,    # 86   87 88
+	 None,None,None,                        # 89   8A 8B
+	 None,                                  # 8C
+	 None,                                  # 8D
+	 None,                                  # 8E
+	 None,                                  # 8F
+	 None,                                  # 90
 	"dex_rating",                   1,2,    # 91   92 93
 	"key_item_get",                 1,2,    # 94   95 96
-	"poison",                               # 97
-	"trade_machine",                        # 98         [!]
+	"poison_damage",                        # 97
+	"trade_machine",                        # 98
 	"pc_turn_on",                           # 99
 	"pc_turn_off",                          # 9A
 	"pc_log_in",                            # 9B
@@ -966,7 +1128,7 @@ _overworld_sound_names = (
 	"teleport_enter",                       # A0
 	"teleport_spin",                        # A1
 	"ledge_jump",                           # A2
-	"teleport_land",                        # A3         [!]
+	"teleport_land",                        # A3
 	"fly",                                  # A4
 	"wrong",                        1,      # A5   A6
 	"arrow_tile",                           # A7
@@ -976,35 +1138,35 @@ _overworld_sound_names = (
 	"cut",                                  # AC
 	"open_door",                            # AD
 	"ball_land",                    1,      # AE   AF
-	"unused_B0",                    1,      # B0   B1    [!]
+	"unused_B0",                    1,      # B0   B1
 	"purchase",                     1,      # B2   B3
 	"bump",                                 # B4
 	"enter_exit",                           # B5
 	"save",                         1       # B6   B7
 )
 _bank02_sound_names = (
-	"MUS_poke_flute",                       # B8
+	"mus_poke_flute",                       # B8
 	"safari_zone_pa",                       # B9
-	"MUS_pallet_town",              1,2,    # BA   BB BC
-	"MUS_pokemon_center",           1,2,    # BD   BE BF
-	"MUS_gym",                      1,2,    # C0   C1 C2
-	"MUS_pewter_city",              1,2,3,  # C3   C4 C5 C6
-	"MUS_cerulean_city",            1,2,    # C7   C8 C9
-	"MUS_celadon_city",             1,2,    # CA   CB CC
-	"MUS_cinnabar_island",          1,2,    # CD   CE CF
-	"MUS_vermilion_city",           1,2,3,  # D0   D1 D2 D3
-	"MUS_lavender_town",            1,2,3,  # D4   D5 D6 D7
-	"MUS_ss_anne",                  1,2,    # D8   D9 DA
-	"MUS_professor_oak",            1,2,    # DB   DC DD
-	"MUS_rival",                    1,2,    # DE   DF E0
-	"MUS_guide",                    1,2,3,  # E1   E2 E3 E4
-	"MUS_evolution",                1,2,    # E5   E6 E7
-	"MUS_pokemon_healed",           1,2,    # E8   E9 EA
-	"MUS_road_to_viridian_city",    1,2,3,  # EB   EC ED EE
-	"MUS_road_to_bill",             1,2,3,  # EF   F0 F1 F2
-	"MUS_road_to_cerulean_city",    1,2,3,  # F3   F4 F5 F6
-	"MUS_road_to_lavender_town",    1,2,3,  # F7   F8 F9 FA
-	"MUS_victory_road",             1,2,3   # FB   FC FD FE
+	"mus_pallet_town",              1,2,    # BA   BB BC
+	"mus_pokemon_center",           1,2,    # BD   BE BF
+	"mus_gym",                      1,2,    # C0   C1 C2
+	"mus_pewter_city",              1,2,3,  # C3   C4 C5 C6
+	"mus_cerulean_city",            1,2,    # C7   C8 C9
+	"mus_celadon_city",             1,2,    # CA   CB CC
+	"mus_cinnabar_island",          1,2,    # CD   CE CF
+	"mus_vermilion_city",           1,2,3,  # D0   D1 D2 D3
+	"mus_lavender_town",            1,2,3,  # D4   D5 D6 D7
+	"mus_ss_anne",                  1,2,    # D8   D9 DA
+	"mus_professor_oak",            1,2,    # DB   DC DD
+	"mus_rival",                    1,2,    # DE   DF E0
+	"mus_guide",                    1,2,3,  # E1   E2 E3 E4
+	"mus_evolution",                1,2,    # E5   E6 E7
+	"mus_pokemon_healed",           1,2,    # E8   E9 EA
+	"mus_road_to_viridian_city",    1,2,3,  # EB   EC ED EE
+	"mus_road_to_bill",             1,2,3,  # EF   F0 F1 F2
+	"mus_road_to_cerulean_city",    1,2,3,  # F3   F4 F5 F6
+	"mus_road_to_lavender_town",    1,2,3,  # F7   F8 F9 FA
+	"mus_victory_road",             1,2,3   # FB   FC FD FE
 )
 _bank1F_sound_names = (
 	"intro_lunge",                          # B8
@@ -1014,31 +1176,36 @@ _bank1F_sound_names = (
 	"intro_impact",                         # BC
 	"intro_whoosh",                         # BD
 	"slots_stop_wheel",                     # BE
-	"slots_reward",                         # BF
+	"slots_payout",                         # BF
 	"slots_spin",                   1,      # C0   C1
 	"shooting_star",                        # C2
-	"MUS_title_screen",             1,2,3,  # C3   C4 C5 C6
-	"MUS_credits",                  1,2,    # C7   C8 C9
-	"MUS_hall_of_fame",             1,2,    # CA   CB CC
-	"MUS_prof_oaks_lab",            1,2,    # CD   CE CF
-	"MUS_jigglypuffs_song",         1,      # D0   D1
-	"MUS_bicycle",                  1,2,3,  # D2   D3 D4 D5
-	"MUS_surf",                     1,2,    # D6   D7 D8
-	"MUS_game_corner",              1,2,    # D9   DA DB
-	"MUS_intro",                    1,2,3,  # DC   DD DE DF
-	"MUS_rocket_hideout",           1,2,3,  # E0   E1 E2 E3
-	"MUS_viridian_forest",          1,2,3,  # E4   E5 E6 E7
-	"MUS_mt_moon",                  1,2,3,  # E8   E9 EA EB
-	"MUS_pokemon_mansion",          1,2,3,  # EC   ED EE EF
-	"MUS_pokemon_tower",            1,2,    # F0   F1 F2
-	"MUS_silph_co",                 1,2,    # F3   F4 F5
-	"MUS_encounter_evil_trainer",   1,2,    # F6   F7 F8
-	"MUS_encounter_cute_trainer",   1,2,    # F9   FA FB
-	"MUS_encounter_trainer",        1,2     # FC   FD FE
+	"mus_title_screen",             1,2,3,  # C3   C4 C5 C6
+	"mus_credits",                  1,2,    # C7   C8 C9
+	"mus_hall_of_fame",             1,2,    # CA   CB CC
+	"mus_prof_oaks_lab",            1,2,    # CD   CE CF
+	"jigglypuffs_song",             1,      # D0   D1
+	"mus_bicycle",                  1,2,3,  # D2   D3 D4 D5
+	"mus_surf",                     1,2,    # D6   D7 D8
+	"mus_game_corner",              1,2,    # D9   DA DB
+	"mus_intro",                    1,2,3,  # DC   DD DE DF
+	"mus_rocket_hideout",           1,2,3,  # E0   E1 E2 E3
+	"mus_viridian_forest",          1,2,3,  # E4   E5 E6 E7
+	"mus_mt_moon",                  1,2,3,  # E8   E9 EA EB
+	"mus_pokemon_mansion",          1,2,3,  # EC   ED EE EF
+	"mus_pokemon_tower",            1,2,    # F0   F1 F2
+	"mus_silph_co",                 1,2,    # F3   F4 F5
+	"mus_encounter_shady_trainer",  1,2,    # F6   F7 F8
+	"mus_encounter_cute_trainer",   1,2,    # F9   FA FB
+	"mus_encounter_trainer",        1,2     # FC   FD FE
 )
 _battle_sound_names = (
-#   "level_up",                     1,2,    # 86   87 88
-#    ...                                      ...
+	"level_up",                     1,2,    # 86   87 88
+	 None,None,None,                        # 89   8A 8B
+	 None,                                  # 8C
+	 None,                                  # 8D
+	 None,                                  # 8E
+	 None,                                  # 8F
+	 None,                                  # 90
 	"ball_throw",                   1,      # 91   92
 	"ball_poof",                    1,      # 93   94
 	"ball_deflect",                 1,      # 95   96
@@ -1094,13 +1261,13 @@ _battle_sound_names = (
 	"sing",                         1,      # E4   E5
 	"hyper_beam",                   1,2,    # E6   E7 E8
 	"trainer_ping",                         # E9
-	"MUS_battle_gym_leader",        1,2,    # EA   EB EC
-	"MUS_battle_trainer",           1,2,    # ED   EE EF
-	"MUS_battle_wild_pokemon",      1,2,    # F0   F1 F2
-	"MUS_battle_champion",          1,2,    # F3   F4 F5
-	"MUS_victory_trainer",          1,2,    # F6   F7 F8
-	"MUS_victory_wild_pokemon",     1,2,    # F9   FA FB
-	"MUS_victory_gym_leader",       1,2     # FC   FD FE
+	"mus_battle_gym_leader",        1,2,    # EA   EB EC
+	"mus_battle_trainer",           1,2,    # ED   EE EF
+	"mus_battle_wild_pokemon",      1,2,    # F0   F1 F2
+	"mus_battle_champion",          1,2,    # F3   F4 F5
+	"mus_victory_trainer",          1,2,    # F6   F7 F8
+	"mus_victory_wild_pokemon",     1,2,    # F9   FA FB
+	"mus_victory_gym_leader",       1,2     # FC   FD FE
 )
 _yellow_sound_names = (
 	"surfing_jump",                         # 91
@@ -1109,96 +1276,59 @@ _yellow_sound_names = (
 	"surfing_tally_score",                  # 94
 	"surfing_land",                         # 95
 	"surfing_hi_score",             1,2,    # 96   97 98
-	"MUS_surfing_pikachu",          1,2,    # 99   9A 9B
-	"MUS_team_rocket",              1,2,    # 9C   9D 9E
-	"MUS_unused_giovanni",          1,2,3,  # 9F   A0 A1 A2     # unused
-	"MUS_gb_printer",                       # A3
+	"mus_surfing_pikachu",          1,2,    # 99   9A 9B
+	"mus_team_rocket",              1,2,    # 9C   9D 9E
+	"mus_unused_giovanni",          1,2,3,  # 9F   A0 A1 A2
+	"mus_gb_printer",                       # A3
 )
 _sound_banks = {
-	0x02: ( 1, _bank02_sound_names ),
-	0x08: ( 0, _battle_sound_names ),
-	0x1F: ( 1, _bank1F_sound_names ),
-	0x20: ( 2, _yellow_sound_names )
+	0x02: _bank02_sound_names,
+	0x08: _battle_sound_names,
+	0x1F: _bank1F_sound_names,
 }
-def get_sound_name(bank, n, yellow=False):
-	bank = _sound_banks.get(bank)
-	if bank:
-		if n >= 0x91:
-			t, names = bank
-			if   t == 1:
-				if n <= 0xB7: names = _overworld_sound_names
-				else:         n -= 0x27
-			elif t == 2 and not yellow:
-				return None
-			n -= 0x91
-			if n < len(names):
-				s = names[n]
-				if type(s) is int:
-					return names[n - s] + "_ch" + str(s + 1)
-				return s
+def sound_name(bank: int, n: int, yellow:bool=False) -> str:
+	names = _sound_banks.get(bank)
+	if names is None:
+		if yellow and bank == 0x20:
+			names = _yellow_sound_names
 		else:
-			s = get_static_sound_name(n)
-			if s: return s
-			s = "item_get" if bank[0] == 1 else "level_up"
-			if n != 0x86: s += "_ch"+str(n - 0x85)
-			return s
+			return None
+	if n >= 0x86:
+		i = n - 0x86
+		if bank == 0x02 or bank == 0x1F:
+			if n < 0xB8: names = _overworld_sound_names
+			else:        i -= 0x32 # 0xB8 - 0x86
+		if i < len(names):
+			s = names[i]
+			if type(s) is int: return f"{names[i - s]}_ch{s + 1}"
+			elif s:            return s
+	return static_sound_name(n)
 
-def get_battle_sound_name(n):
-	return get_sound_name(0x08, n, False)
+def battle_sound_name(n: int) -> str:
+	return sound_name(8, n)
 
+def does_sound_loop(bank: int, n: int, yellow:bool=False) -> bool:
+	if   bank == 0x02: return n >= 0xBA
+	elif bank == 0x08: return n >= 0xEA
+	elif bank == 0x1F: return n >= 0xC3 and n not in b"\xD1\xD2\xDC\xDD\xDE\xDF"
+	elif yellow:
+		if bank == 0x20: return 0x99 <= n <= 0xA3
 
-_anim_names = (
-	"show_sprite",
-	"enemy_damaged",
-	"player_damaged",
-	"enemy_screen_shake",
-	"trade_ball_drop",
-	"trade_ball_appear1",
-	"trade_ball_appear2",
-	"trade_ball_poof",
-	"player_spiral_light",
-	"enemy_spiral_light",
-	"player_square_light",
-	"enemy_square_light",
-	"player_spiral_dark",
-	"enemy_spiral_dark",
-	"player_square_dark",
-	"enemy_square_dark",
-	"player_unused",
-	"enemy_unused",
-	"player_paralyzed",
-	"enemy_paralyzed",
-	"player_poison_burn",
-	"enemy_poison_burn",
-	"player_asleep",
-	"enemy_asleep",
-	"player_confused",
-	"enemy_confused",
-	"faint",
-	"ball_throw",
-	"ball_shake",
-	"ball_poof",
-	"ball_block",
-	"great_ball_throw",
-	"ultra_ball_throw",
-	"screen_shake",
-	"hide_sprite",
-	"throw_rock",
-	"throw_bait",
-	"screen_wave"
-)
-def get_animation_name(n):
-	if   n <= 165: return _move_names[n]
-	elif n <= 202: return _anim_names[n - 166]
+def sound_bank_name(bank: int, yellow:bool=False) -> str:
+	if   bank == 0x02: return "overworld"
+	elif bank == 0x08: return "battle"
+	elif bank == 0x1F: return "misc"
+	elif yellow:
+		if bank == 0x20: return "yellow"
 
 
 _tileset_names = (
 	"overworld",
-	"players_house",
+	"players_house", # also Copycat's house
 	"pokemart",
 	"forest",
-	"players_room",
-	"gym2",
+	"players_room",  # also Copycat's room
+	"gym2",          # Oak's Lab, Fighting Dojo, Lance's room
 	"pokecenter",
 	"gym",
 	"house",
@@ -1209,19 +1339,19 @@ _tileset_names = (
 	"ship",
 	"shipyard",
 	"cemetery",
-	"building",
+	"building",      # Bill's house, Pokemon Fan Club, Silph Co. top floor
 	"cave",
-	"lobby",
-	"mansion",
-	"lab",
-	"club",
-	"facility",
+	"business",      # elevators, Game Corner, Celadon Department Store
+	"celadon_mansion",
+	"lab",           # Cinnabar Lab, Warden's house, Safari Zone buildings
+	"cable_club",    # also Bike Shop
+	"facility",      # Rocket Hideout, Power Plant, Silph Co., Cinnabar Mansion
 	"indigo_plateau",
 	
 	# Yellow only:
 	"beach_house"
 )
-def get_tileset_name(n, yellow=False):
+def tileset_name(n: int, yellow:bool=False) -> str:
 	if n < (24 if yellow else 23):
 		return _tileset_names[n]
 
@@ -1238,7 +1368,7 @@ _map_names = (
 	"cinnabar_island",
 	"indigo_plateau",
 	"saffron_city",
-	"unused_0B",
+	 None,
 	"route_1",
 	"route_2",
 	"route_3",
@@ -1302,10 +1432,10 @@ _map_names = (
 	"daycare",
 	"route_6_gate",
 	"underground_route_6",
-	"unused_underground_route_6_copy",
+	 None,
 	"route_7_gate",
 	"underground_route_7",
-	"unused_underground_route_7_copy",
+	 None,
 	"route_8_gate",
 	"underground_route_8",
 	"rock_tunnel_pokecenter",
@@ -1331,20 +1461,20 @@ _map_names = (
 	"ss_anne_captains_room",
 	"ss_anne_1F_cabins",
 	"ss_anne_2F_cabins",
-	"unused_69",
-	"unused_6A",
-	"unused_6B",
+	 None,
+	 None,
+	 None,
 	"victory_road_1F",
-	"unused_6C",
-	"unused_6D",
-	"unused_6E",
-	"unused_6F",
-	"unused_70",
+	 None,
+	 None,
+	 None,
+	 None,
+	 None,
 	"lances_room",
-	"unused_72",
-	"unused_73",
-	"unused_74",
-	"unused_75",
+	 None,
+	 None,
+	 None,
+	 None,
 	"hall_of_fame",
 	"underground_north_south",
 	"champions_room",
@@ -1479,9 +1609,57 @@ _map_names = (
 	# Yellow only
 	"beach_house"
 )
-def get_map_name(n, yellow=False):
+def map_name(n: int, yellow:bool=False) -> str:
 	if n < (0xF8 if yellow else 0xF7):
-		return _map_names[n]
+		name = _map_names[n]
+		if name is None: name = f"unused_{n:02X}"
+		return name
+def map_index(name: str, yellow:bool=False) -> int:
+	n = _map_names.index(name)
+	if n != -1 and (n < 0xF7 or yellow):
+		return n
 
-def glitch_map_ids(yellow=False):
-	return range(248 if yellow else 247, 256)
+dummy_map_ids = bytes((
+	0x0B, 0x69, 0x6A, 0x6B, 0x6D, 0x6E,
+	0x6F, 0x70, 0x72, 0x73, 0x74, 0x75,
+	0xCC, 0xCD, 0xCE, 0xE7, 0xED, 0xEE,
+	0xF1, 0xF2, 0xF3, 0xF4
+))
+def glitch_map_ids(yellow:bool=False) -> range:
+	return range(0xF8 if yellow else 0xF7, 0x100)
+
+
+_map_palette_ids = bytes((
+	1,   2,   3,   4,   5,   6,   7,   8,   9,   10,
+	11,  0xFF,0,   0,   0,   0,   0,   0,   0,   0,
+	0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+	0,   0,   0,   0,   0,   0,   0,   1,   1,   1,
+	1,   2,   2,   2,   2,   2,   35,  0,   0,   0,
+	0,   0,   3,   3,   3,   3,   3,   3,   3,   35,
+	35,  35,  4,   4,   4,   4,   4,   4,   0,   0xFF,
+	0,   0,   0,   0,   0,   0xFF,0,   0,   0xFF,0,
+	0,   0,   35,  0,   0,   35,  0,   0,   0,   6,
+	6,   6,   6,   6,   6,   6,   6,   6,   6,   6,
+	6,   6,   6,   6,   6,   0xFF,0xFF,0xFF,35,  0xFF,
+	0xFF,0xFF,0xFF,10,  0xFF,0xFF,0xFF,0xFF,10,  0,
+	10,  0,   7,   7,   7,   7,   7,   7,   7,   7,
+	7,   7,   7,   7,   7,   7,   7,   7,   7,   7,
+	7,   5,   25,  25,  25,  25,  25,  25,  25,  5,
+	5,   5,   8,   8,   8,   8,   8,   8,   8,   35,
+	35,  35,  35,  6,   8,   9,   9,   9,   9,   9,
+	9,   9,   9,   9,   10,  11,  11,  11,  11,  11,
+	11,  11,  11,  11,  0,   0,   0,   0,   0,   0,
+	0,   0,   35,  0,   35,  0,   6,   35,  35,  7,
+	7,   7,   7,   7,   0xFF,0xFF,0xFF,11,  11,  11,
+	11,  11,  11,  11,  9,   9,   9,   8,   8,   8,
+	8,   8,   8,   8,   8,   8,   35,  35,  35,  5,
+	4,   0xFF,35,  11,  11,  11,  11,  0xFF,0xFF,0xFF,
+	0xFF,0xFF,0xFF,0xFF,0xFF,1,   35,  25,
+					
+	# Yellow only:
+	0
+))
+def map_palette_id(n: int, yellow:bool=False) -> int:
+	if n <= (0xF8 if yellow else 0xF7):
+		n = _map_palette_ids[n]
+		if n != 0xFF: return n
