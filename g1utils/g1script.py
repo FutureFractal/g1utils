@@ -93,7 +93,7 @@ def _cmd_num(i, c, opt):
 	if len(s) > ndigits:
 		# If ndigits is shorter than the actual amount of digits, the first digit will be glitched.
 		split = -(ndigits-1)
-		s = glitch_char(int(s[:split] - 10) & 0xFF) + s[split:]
+		s = glitch_char((int(s[:split]) - 10) & 0xFF) + s[split:]
 	if   nbytes & 0x80 != 0: s.rjust(ndigits, '0')
 	elif nbytes & 0x40 == 0: s.rjust(ndigits, ' ')
 	return False, s

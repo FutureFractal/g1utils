@@ -53,9 +53,14 @@ def get_mon_info(rom: Memory, n: int) -> Info:
 	info.name        = rom.get_mon_name(n)
 	info.cry         = rom.get_mon_cry_sound(n)
 	info.sprite_bank = rom.get_mon_sprite_bank(n)
+
 	rom.get_mon_learnset(n, info)
 	rom.get_mon_evolutions(n, info)
-	rom.get_mon_dex_entry(n, info)
+
+	try: rom.get_mon_dex_entry(n, info)
+	except:
+		import traceback; traceback.print_exc()
+
 	return info
 
 def get_dex_mon_base_stats_ptr(rom: Memory, n: int) -> ptr:

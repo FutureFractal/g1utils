@@ -161,8 +161,8 @@ def dump_mon_dex_measurements(writer: Writer, info: Info):
 		writer.prop("weight", dex_decimal(info.weight), comment=comment)
 
 def dump_mon_dex_description(writer, info):
-	if info.desc:
-		writer.multi_line_string_prop("description", info.desc)
+	if info.description:
+		writer.multi_line_string_prop("description", info.description)
 
 
 #== Moves ==================================================================================================
@@ -241,7 +241,7 @@ def dump_dex_mon_palette(writer: Writer, rom: Memory, n: int, expand:bool=True):
 		if name:
 			writer.prop("palette", name)
 		else:
-			if rom.is_yellow:
+			if rom.is_yellow and not rom.is_japan:
 				with writer.begin_object_prop("palette"):
 					writer.tuple_prop("sgb", pal_repr(rom, n, "sgb"))
 					writer.tuple_prop("gbc", pal_repr(rom, n, "gbc"))
@@ -445,7 +445,7 @@ def dump_all_glitchmons(rom: Memory, syntax:str=DEFAULT_SYNTAX):
 		with writer.begin_top_level_dict("glitchmon_families"):
 			for n in rom.find_all_glitchmon_dex_nums():
 				with writer.begin_dict_prop(str(n)):
-					dump_dex_mon_info(writer, rom, n)
+					dump_mon_family_info(writer, rom, n)
 		with writer.begin_top_level_dict("glitchmon_species"):
 			for n in g1const.glitchmon_ids:
 				with writer.begin_dict_prop(str(n)):
